@@ -46,7 +46,7 @@
                 radial-gradient(60vmax 40vmax at 50% 110%, color-mix(in srgb, var(--c1) 12%, transparent), transparent); }
   main { max-width: 560px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); }
   [hidden] { display: none !important; }
-  .view { animation: enter .55s var(--ease) both; }
+  .view { animation: enter .32s var(--ease) both; }
   @keyframes enter { from { opacity: 0; transform: translateY(14px) scale(.985); } }
 
   h1 { font-size: 44px; line-height: 1.05; letter-spacing: -.03em; font-weight: 800; margin: 28px 0 4px; }
@@ -64,7 +64,7 @@
   input.code { font-weight: 700; letter-spacing: .35em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 
   .btn { appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; padding: 15px 22px; border-radius: 14px; color: #fff; background: var(--accent);
-    transition: transform .35s var(--spring), filter .2s, opacity .2s; }
+    transition: transform .22s var(--spring), filter .15s, opacity .15s; }
   .btn:hover { filter: brightness(1.06); }
   .btn:active { transform: scale(.95); }
   .btn:disabled { opacity: .35; pointer-events: none; }
@@ -77,7 +77,7 @@
 
   .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .tile { appearance: none; font: inherit; color: var(--label); text-align: left; cursor: pointer; padding: 18px; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between;
-    transition: transform .4s var(--spring), box-shadow .3s; }
+    transition: transform .26s var(--spring), box-shadow .2s; }
   .tile:active { transform: scale(.96); }
   .tile svg { width: 44px; height: 44px; fill: currentColor; }
   .tile b { display: block; font-size: 19px; letter-spacing: -.01em; }
@@ -87,7 +87,7 @@
   .seg { display: grid; grid-template-columns: repeat(3, 1fr); padding: 3px; border-radius: 12px; background: color-mix(in srgb, var(--label2) 18%, transparent); position: relative; }
   .seg button { appearance: none; border: 0; background: transparent; font: inherit; font-weight: 600; padding: 9px; color: var(--label); cursor: pointer; border-radius: 9px; position: relative; z-index: 1; }
   .seg i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 9px; background: var(--cell);
-    box-shadow: 0 2px 6px rgba(0,0,0,.14); transition: transform .45s var(--spring); }
+    box-shadow: 0 2px 6px rgba(0,0,0,.14); transition: transform .28s var(--spring); }
   .panel { padding: 16px; display: grid; gap: 14px; margin-top: 14px; }
   .status { text-align: center; font-size: 15px; font-weight: 600; color: var(--label2); line-height: 1.35; }
   .status.err { color: #ff3b30; }
@@ -100,36 +100,39 @@
   .roomcode { font-size: 44px; font-weight: 800; letter-spacing: .16em; text-align: center; padding: 18px 0 20px; padding-left: .16em; font-variant-numeric: tabular-nums; }
   .x { appearance: none; border: 0; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--label2) 22%, transparent); color: var(--label2); font-size: 16px; cursor: pointer; line-height: 1; transition: transform .3s var(--spring); }
   .x:active { transform: scale(.85); }
-  .pop { animation: pop .5s var(--spring) both; }
+  .pop { animation: pop .3s var(--spring) both; }
   @keyframes pop { from { opacity: 0; transform: scale(.8); } }
 
   /* ---------- game ---------- */
   #boardWrap { width: min(100%, calc(100vh - 230px), 620px); width: min(100%, calc(100dvh - 230px), 620px); margin: 0 auto; }
-  .corners { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0; min-height: 62px; }
+  .corners { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0; min-height: 70px; }
   .badge { flex: 1 1 0; min-width: 0; max-width: calc(50% - 5px); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 6px; border-radius: 999px;
     background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: .5px solid var(--glassLine);
-    transition: transform .5s var(--spring), box-shadow .4s, opacity .3s; opacity: .62; }
+    transition: transform .3s var(--spring), box-shadow .25s, opacity .2s; opacity: .62; }
   .badge.right { flex-direction: row-reverse; padding: 6px 6px 6px 8px; text-align: right; }
   .badge.active { flex-grow: 1.6; max-width: none; opacity: 1; transform: scale(1.03); box-shadow: 0 0 0 2.5px var(--pc), 0 8px 26px color-mix(in srgb, var(--pc) 40%, transparent); }
-  .badge .avatar { width: 46px; height: 46px; }
+  .badge .avatar { width: 50px; height: 50px; font-size: 21px; }
   .corners[data-n="1"] .badge { max-width: 100%; }
   .info { flex: 1; min-width: 0; }
   @media (max-width: 440px) {
-    .badge { gap: 8px; } .badge .avatar { width: 38px; height: 38px; font-size: 16px; } .die { width: 42px; height: 42px; padding: 4px; border-radius: 12px; }
-    .pips i { width: 6.5px; height: 6.5px; } .tg { display: none; } .corners { min-height: 54px; }
+    .badge { gap: 8px; } .badge .avatar { width: 40px; height: 40px; font-size: 17px; } .die { width: 50px; height: 50px; padding: 5px; border-radius: 13px; }
+    .pips i { width: 8px; height: 8px; } .tg { display: none; } .corners { min-height: 62px; }
   }
   .nm { font-weight: 650; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .st { font-size: 12.5px; color: var(--label2); white-space: nowrap; }
-  .die { flex: none; width: 50px; height: 50px; padding: 5px; border: 0; border-radius: 14px; cursor: default;
+  .turnTag { display: none; font-size: 10px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+  .badge.active.mine .turnTag { display: block; animation: tagIn .25s var(--spring) both; }
+  @keyframes tagIn { from { opacity: 0; transform: translateY(4px); } }
+  .die { flex: none; width: 58px; height: 58px; padding: 6px; border: 0; border-radius: 14px; cursor: default;
     background: linear-gradient(145deg, #fff, #e4e4ea); color: #111;
-    box-shadow: inset 0 -3px 5px rgba(0,0,0,.1), inset 0 2px 3px #fff, 0 4px 10px rgba(0,0,0,.25); animation: dieIn .5s var(--spring) both; }
-  .die.rollable { cursor: pointer; animation: dieIn .5s var(--spring) both, breathe 1.3s ease-in-out .5s infinite; box-shadow: inset 0 -3px 5px rgba(0,0,0,.1), inset 0 2px 3px #fff, 0 0 0 3px var(--accent), 0 6px 18px rgba(0,122,255,.5); }
-  .die.roll { animation: tumble .62s var(--ease) both; }
+    box-shadow: inset 0 -3px 5px rgba(0,0,0,.1), inset 0 2px 3px #fff, 0 4px 10px rgba(0,0,0,.25); animation: dieIn .3s var(--spring) both; }
+  .die.rollable { cursor: pointer; animation: dieIn .3s var(--spring) both, breathe .9s ease-in-out .3s infinite; box-shadow: inset 0 -3px 5px rgba(0,0,0,.1), inset 0 2px 3px #fff, 0 0 0 3px var(--accent), 0 6px 18px rgba(0,122,255,.5); }
+  .die.roll { animation: tumble .4s var(--ease) both; }
   @keyframes dieIn { from { transform: scale(.4) rotate(-40deg); opacity: 0; } }
   @keyframes breathe { 50% { transform: scale(1.1); } }
   @keyframes tumble { 0% { transform: scale(.7) rotate(0); } 45% { transform: scale(1.25) rotate(240deg) translateY(-6px); } 100% { transform: scale(1) rotate(360deg); } }
   .pips { display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); width: 100%; height: 100%; }
-  .pips i { place-self: center; width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #555, #111); transform: scale(0); transition: transform .25s var(--spring); }
+  .pips i { place-self: center; width: 9.5px; height: 9.5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #555, #111); transform: scale(0); transition: transform .25s var(--spring); }
   .pips i.on { transform: scale(1); }
 
   #board { width: 100%; aspect-ratio: 1; display: block; border-radius: 26px; background: var(--boardBg); box-shadow: var(--shadow); touch-action: manipulation; }
@@ -139,8 +142,9 @@
   .inner { fill: var(--cell); }
   .slot { fill: var(--slot); }
   .star { fill: var(--star); } .starw { fill: #fff; }
-  .quad { transition: opacity .4s; }
-  .shadow { fill: #000; opacity: .22; }
+  .quad { transition: opacity .25s; }
+  .shadow { fill: #000; opacity: .26; }
+  .pw { stroke: #fff; stroke-width: .045; paint-order: stroke; }
   .rim { fill: none; stroke: rgba(255,255,255,.7); stroke-width: .05; }
   .tok { transition-property: transform; transition-timing-function: cubic-bezier(.4, 0, .2, 1); cursor: default; }
   .tok .ball { transform-box: fill-box; }
@@ -149,14 +153,14 @@
   .tok.movable .halo { display: block; animation: halo 1.1s ease-in-out infinite; }
   @keyframes halo { 0% { transform: scale(.86); opacity: .55; } 100% { transform: scale(1.22); opacity: .1; } }
 
-  #msg { text-align: center; font-weight: 600; margin: 14px 0 2px; min-height: 1.4em; transition: opacity .25s; }
+  #msg { text-align: center; font-weight: 600; margin: 14px 0 2px; min-height: 1.4em; transition: opacity .15s; }
   #msg.swap { opacity: 0; }
   #hint { text-align: center; color: var(--accent); font-weight: 650; min-height: 1.4em; }
   .bar { display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 6px; }
   .round, .btn.glass.round { width: 44px; height: 44px; border-radius: 50%; padding: 0; display: grid; place-items: center; color: var(--accent); background: var(--glass); }
   .round svg { width: 22px; height: 22px; }
   #over { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.35); animation: fade .35s both; }
-  #over .sheet { width: min(520px, 100%); padding: 10px 22px max(24px, env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; animation: sheet .6s var(--ease) both;
+  #over .sheet { width: min(520px, 100%); padding: 10px 22px max(24px, env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; animation: sheet .4s var(--ease) both;
     background: var(--glass); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
   #over .grab { width: 38px; height: 5px; border-radius: 3px; background: var(--label2); opacity: .4; margin: 0 auto 14px; }
   #over h2 { margin: 6px 0 12px; font-size: 28px; letter-spacing: -.02em; text-align: center; }
@@ -169,7 +173,7 @@
   .confetti { position: fixed; top: -12px; width: 9px; height: 14px; border-radius: 2px; z-index: 30; pointer-events: none; animation: fall linear forwards; }
   @keyframes fall { to { transform: translate(var(--dx), 110vh) rotate(var(--rot)); opacity: .9; } }
   #toast { position: fixed; left: 50%; top: max(14px, env(safe-area-inset-top)); transform: translate(-50%, -80px); z-index: 40; padding: 12px 20px; border-radius: 999px; font-weight: 600; font-size: 15px;
-    background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: .5px solid var(--glassLine); box-shadow: var(--shadow); transition: transform .5s var(--spring); max-width: 92vw; }
+    background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: .5px solid var(--glassLine); box-shadow: var(--shadow); transition: transform .32s var(--spring); max-width: 92vw; }
   #toast.show { transform: translate(-50%, 0); }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>
@@ -500,7 +504,7 @@ function commit() {
   schedule();
 }
 
-// Delays leave room for the token-walk animation (~150ms per cell) before the next action.
+// Delays leave room for the token-walk animation (~95ms per cell) before the next action.
 function schedule() {
   clearTimeout(timer);
   const g = H.game;
@@ -508,10 +512,10 @@ function schedule() {
   const p = g.players[g.turn];
   const auto = p.bot || !p.connected;
   if (g.phase === 'move') {
-    if (!Ludo.legalMoves(g).length) timer = setTimeout(() => { Ludo.pass(g); commit(); }, 1400);
-    else if (auto) timer = setTimeout(() => hostMove(g.turn, Ludo.botMove(g)), 1100);
+    if (!Ludo.legalMoves(g).length) timer = setTimeout(() => { Ludo.pass(g); commit(); }, 950);
+    else if (auto) timer = setTimeout(() => hostMove(g.turn, Ludo.botMove(g)), 750);
   } else if (auto) {
-    timer = setTimeout(() => hostRoll(g.turn), 1000);
+    timer = setTimeout(() => hostRoll(g.turn), 900);
   }
 }
 
@@ -629,20 +633,20 @@ async function drive(node) {
   node._run = true;
   while (node._cur !== node._target) {
     const from = node._cur, to = node._target;
-    let next = to, ms = 450;
-    if (from >= 0 && to > from) { next = from + 1; ms = 150; }
-    else if (from === -1 && to === 0) { ms = 320; }
+    let next = to, ms = 300;
+    if (from >= 0 && to > from) { next = from + 1; ms = 95; }
+    else if (from === -1 && to === 0) { ms = 220; }
     node._cur = next;
     place(node, next, ms);
-    if (ms === 150) {
-      node._ball.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-.3px) scale(1.12)' }, { transform: 'translateY(0)' }], { duration: 150, easing: 'ease-out' });
+    if (ms === 95) {
+      node._ball.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-.3px) scale(1.1)' }, { transform: 'translateY(0)' }], { duration: 95, easing: 'ease-out' });
       sfx.step(next % 10);
     } else if (from === -1) sfx.out();
     else sfx.capture();
     await sleep(ms + 8);
   }
-  if (node._cur === 56) { sfx.home(); node._ball.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 420, easing: 'cubic-bezier(.34,1.56,.64,1)' }); }
-  place(node, node._cur, 220);
+  if (node._cur === 56) { sfx.home(); node._ball.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'cubic-bezier(.34,1.56,.64,1)' }); }
+  place(node, node._cur, 140);
   node._run = false;
 }
 
@@ -651,18 +655,19 @@ function makeToken(layer, pl, ti) {
   const node = el('g', { id, class: 'tok' }, layer);
   node._color = pl.color; node._ti = ti; node._ox = node._oy = 0; node._sc = 1;
   const c = pl.color;
-  el('ellipse', { cx: 0, cy: .34, rx: .34, ry: .1, class: 'shadow' }, node);
+  el('ellipse', { cx: 0, cy: .4, rx: .42, ry: .12, class: 'shadow' }, node);
   const ball = el('g', { class: 'ball' }, node);
-  el('ellipse', { cx: 0, cy: .3, rx: .46, ry: .2, class: `halo f${c}` }, ball);
-  // pawn: base disc, flared body, collar, head
-  el('ellipse', { cx: 0, cy: .3, rx: .31, ry: .1, class: `f${c}` }, ball);
-  el('ellipse', { cx: 0, cy: .3, rx: .31, ry: .1, fill: '#000', opacity: .28 }, ball);
+  el('ellipse', { cx: 0, cy: .34, rx: .55, ry: .24, class: `halo f${c}` }, ball);
+  const g = el('g', { transform: 'translate(0 .07) scale(1.28)' }, ball);   // pawn, drawn at 1x then enlarged
+  // pawn: base disc, flared body, collar, head. White outline keeps it readable on same-colour squares.
+  el('ellipse', { cx: 0, cy: .3, rx: .31, ry: .1, class: `f${c} pw` }, g);
+  el('ellipse', { cx: 0, cy: .3, rx: .31, ry: .1, fill: '#000', opacity: .28 }, g);
   const body = 'M-.27,.29 C-.22,.1 -.12,-.06 -.09,-.14 L.09,-.14 C.12,-.06 .22,.1 .27,.29 Z';
-  el('path', { d: body, class: `f${c}` }, ball);
-  el('path', { d: body, fill: 'url(#bodyShade)' }, ball);
-  el('ellipse', { cx: 0, cy: -.14, rx: .15, ry: .05, class: `f${c}` }, ball);
-  el('ellipse', { cx: 0, cy: -.14, rx: .15, ry: .05, fill: '#fff', opacity: .38 }, ball);
-  [`f${c}`, null, null].forEach((cls, k) => el('circle', { cx: 0, cy: -.3, r: .19, ...(cls ? { class: cls } : { fill: `url(#${k === 1 ? 'shade' : 'shine'})` }) }, ball));
+  el('path', { d: body, class: `f${c} pw` }, g);
+  el('path', { d: body, fill: 'url(#bodyShade)' }, g);
+  el('ellipse', { cx: 0, cy: -.14, rx: .15, ry: .05, class: `f${c} pw` }, g);
+  el('ellipse', { cx: 0, cy: -.14, rx: .15, ry: .05, fill: '#fff', opacity: .38 }, g);
+  [`f${c} pw`, null, null].forEach((cls, k) => el('circle', { cx: 0, cy: -.3, r: .19, ...(cls ? { class: cls } : { fill: `url(#${k === 1 ? 'shade' : 'shine'})` }) }, g));
   node._ball = ball;
   node.addEventListener('click', () => onTokenClick(pl.color, ti));
   return node;
@@ -692,7 +697,7 @@ function renderBoard(g, legal) {
     node._target = t.pos;
     if (fresh) { node._cur = t.pos; place(node, t.pos, 0); }
     else if (node._cur !== node._target) drive(node);
-    else if (!node._run) place(node, node._cur, 260);
+    else if (!node._run) place(node, node._cur, 170);
     node.classList.toggle('movable', g.phase === 'move' && g.turn === me && t.pi === me && legal.includes(t.ti));
   }));
   [...layer.children].forEach(n => !seen.has(n.id) && n.remove());
@@ -724,11 +729,26 @@ function setDie(die, v, animate) {
     die._iv = setInterval(() => {
       if (++n >= 7) { clearInterval(die._iv); die._busy = false; die.innerHTML = pipsHTML(die._v); return; }
       die.innerHTML = pipsHTML(1 + Math.floor(Math.random() * 6));
-    }, 75);
+    }, 50);
   } else if (!die._busy) {
     die.innerHTML = pipsHTML(v);
   }
 }
+
+// While a player is up to roll, the die flickers through faces, accelerating and slowing in a wave.
+function idleDie(die) {
+  if (die._idle) return;
+  die._idle = true; die._busy = false; clearInterval(die._iv);
+  let t = 0;
+  const tick = () => {
+    if (!die._idle) return;
+    die.innerHTML = pipsHTML(1 + Math.floor(Math.random() * 6));
+    die._to = setTimeout(tick, 80 + 280 * (.5 + .5 * Math.sin(t)));
+    t += .75;
+  };
+  tick();
+}
+function stopIdle(die) { die._idle = false; clearTimeout(die._to); }
 
 let lastRolls = 0, lastTurnKey = '';
 function renderBadges(g) {
@@ -738,7 +758,7 @@ function renderBadges(g) {
     const pi = g.players.findIndex(p => p.color === c);
     if (pi < 0) { b.style.display = 'none'; return; }
     if (!b.firstChild) {
-      b.innerHTML = '<div class="avatar"></div><div class="info"><div class="nm"></div><div class="st"></div></div><button class="die" hidden></button>';
+      b.innerHTML = '<div class="avatar"></div><div class="info"><div class="turnTag">Your turn</div><div class="nm"></div><div class="st"></div></div><button class="die" hidden></button>';
     }
     b.style.display = '';
     const p = g.players[pi];
@@ -746,6 +766,7 @@ function renderBadges(g) {
     const home = g.tokens[pi].filter(x => x === Ludo.FIN).length;
     const tags = [pi === me ? 'you' : '', p.bot ? 'bot' : '', !p.connected ? 'offline' : ''].filter(Boolean).join(' · ');
     b.classList.toggle('active', active);
+    b.classList.toggle('mine', pi === me);
     b.querySelector('.avatar').textContent = [...p.name][0] || '?';
     b.querySelector('.nm').textContent = p.name;
     b.querySelector('.st').innerHTML = `${home}/4 home${tags ? `<span class="tg"> · ${tags}</span>` : ''}`;
@@ -754,10 +775,9 @@ function renderBadges(g) {
     die.hidden = !active;
     die.disabled = !rollable;
     die.classList.toggle('rollable', rollable);
-    if (active) {
-      const v = g.dice || 5; // idle die keeps the last roll rather than a blank face
-      setDie(die, v, rolled && g.phase === 'move' && !die._busy);
-    }
+    if (active && g.phase === 'roll') idleDie(die);
+    else if (active) { stopIdle(die); setDie(die, g.dice, rolled && !die._busy); }
+    else stopIdle(die);
   });
   document.querySelectorAll('.corners').forEach(c => (c.dataset.n = [...c.children].filter(x => x.style.display !== 'none').length));
   lastRolls = g.rolls;
@@ -767,7 +787,7 @@ function setMsg(text) {
   const m = $('#msg');
   if (m.textContent === text) return;
   m.classList.add('swap');
-  setTimeout(() => { m.textContent = text; m.classList.remove('swap'); }, 120);
+  setTimeout(() => { m.textContent = text; m.classList.remove('swap'); }, 80);
 }
 
 function confetti() {

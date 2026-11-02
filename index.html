@@ -461,7 +461,7 @@ function renderBoard(g, legal) {
   [...layer.children].forEach(n => !seen.has(n.id) && n.remove());
   g.players.forEach(pl => {
     const q = document.getElementById('quad' + pl.color);
-    if (q) q.setAttribute('opacity', g.phase !== 'over' && g.players[g.turn] === pl ? 1 : .55);
+    if (q) q.setAttribute('opacity', g.phase !== 'over' && g.players[g.turn] === pl ? 1 : .88);
   });
   for (let c = 0; c < 4; c++) {
     if (!g.players.some(p => p.color === c)) document.getElementById('quad' + c)?.setAttribute('opacity', .15);

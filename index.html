@@ -89,6 +89,8 @@
   .seg i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 9px; background: var(--cell);
     box-shadow: 0 2px 6px rgba(0,0,0,.14); transition: transform .45s var(--spring); }
   .panel { padding: 16px; display: grid; gap: 14px; margin-top: 14px; }
+  .status { text-align: center; font-size: 15px; font-weight: 600; color: var(--label2); line-height: 1.35; }
+  .status.err { color: #ff3b30; }
 
   .c0 { --pc: var(--c0); } .c1 { --pc: var(--c1); } .c2 { --pc: var(--c2); } .c3 { --pc: var(--c3); }
   .avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 18px; color: #fff;
@@ -196,8 +198,9 @@
     <div class="glass panel pop" id="friendsPanel" hidden>
       <button class="btn block" id="create">Create Room</button>
       <div class="group-title" style="margin:2px 0 -6px">or join with a code</div>
-      <div class="glass group" style="box-shadow:none"><label class="item"><input id="joinCode" class="code" maxlength="5" placeholder="CODE" autocomplete="off"></label></div>
+      <div class="glass group" style="box-shadow:none"><label class="item"><input id="joinCode" class="code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go"></label></div>
       <button class="btn sec block" id="join">Join Room</button>
+      <div id="status" class="status" role="status" hidden></div>
     </div>
     <div class="glass panel pop" id="cpuPanel" hidden>
       <div class="group-title" style="margin:0 0 -6px">Opponents</div>
@@ -247,7 +250,7 @@
 </main>
 <div id="toast"></div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="peerjs.min.js"></script>
 <script src="game.js"></script>
 <script>
 'use strict';
@@ -309,6 +312,15 @@ function toast(m) {
   const t = $('#toast'); t.textContent = m; t.classList.add('show');
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2800);
 }
+function setStatus(text, err) {
+  const st = $('#status');
+  st.hidden = !text; st.textContent = text || ''; st.classList.toggle('err', !!err);
+}
+function busy(on, label) {
+  ['#create', '#join'].forEach(id => ($(id).disabled = on));
+  $('#join').textContent = on && label ? label : 'Join Room';
+}
+const noNetLib = () => typeof Peer === 'undefined' && (setStatus('Networking failed to load. Check your connection and reload the page.', true), true);
 let wl = null;
 async function wake() { try { if (!wl && navigator.wakeLock && S) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => (wl = null)); } } catch {} }
 function unwake() { try { wl && wl.release(); } catch {} wl = null; }
@@ -325,6 +337,7 @@ function resetNet(msg) {
   solo = false; role = peer = hostConn = H = S = room = null; me = -1; guests.clear();
   $('#over').hidden = true; $('#tokens')?.remove(); lastRolls = 0; lastTurnKey = '';
   history.replaceState(null, '', location.pathname);
+  clearTimeout(tBroker); clearTimeout(tHost); busy(false); setStatus('');
   show('home');
   if (msg) toast(msg);
 }
@@ -338,10 +351,14 @@ function createSolo(bots) {
 }
 
 function createRoom() {
+  if (noNetLib()) return;
   const name = myName();
-  room = rnd(5);
+  room = rnd(5); leaving = false;
+  busy(true); setStatus('Creating room…');
   peer = new Peer('ludo-' + room, PEER_OPTS);
+  const giveUp = setTimeout(() => role !== 'host' && failJoin("Can't reach the game server. Your network may be blocking it. Try another network, or turn off any VPN or ad-blocker."), 10000);
   peer.on('open', () => {
+    clearTimeout(giveUp); busy(false); setStatus('');
     role = 'host';
     H = { started: false, players: [mkPlayer(name, cid)], game: null };
     H.players[0].host = true;
@@ -357,26 +374,37 @@ function createRoom() {
   peer.on('error', e => {
     if (e.type === 'unavailable-id') { peer.destroy(); createRoom(); }
     else if (role === 'host') toast('Network error: ' + e.type);
-    else resetNet('Could not create a room (' + e.type + ')');
+    else { clearTimeout(giveUp); failJoin('Could not create a room (' + e.type + '). Try again.'); }
   });
 }
 
+function failJoin(msg) {
+  resetNet();
+  setStatus(msg, true);
+  toast(msg.length > 60 ? msg.slice(0, 57) + '…' : msg);
+}
+
+let tBroker = 0, tHost = 0;
 function joinRoom(code) {
+  if (noNetLib()) return;
   joinName = myName(); room = code; leaving = false; tries = 0;
+  busy(true, 'Connecting…'); setStatus('Connecting to the game server…');
   peer = new Peer(PEER_OPTS);
-  const fail = setTimeout(() => !hostConn?.open && resetNet("Couldn't connect. Check the code and that the host still has the game open."), 15000);
-  peer.on('open', () => { clearTimeout(fail); dial(); });
+  clearTimeout(tBroker); clearTimeout(tHost);
+  tBroker = setTimeout(() => failJoin("Can't reach the game server. Your network may be blocking it. Try another network, or turn off any VPN or ad-blocker."), 10000);
+  peer.on('open', () => { clearTimeout(tBroker); setStatus(`Looking for room ${code}…`); dial(); });
   peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
   peer.on('error', e => {
     if (role === 'guest' && e.type !== 'peer-unavailable') return retry();   // already in a room: try to recover
-    clearTimeout(fail);
-    resetNet(e.type === 'peer-unavailable' ? `Room ${code} not found` : 'Network error: ' + e.type);
+    clearTimeout(tBroker); clearTimeout(tHost);
+    failJoin(e.type === 'peer-unavailable' ? `Room ${code} not found. Check the code, and make sure the host still has the game open.` : `Connection error (${e.type}). Try again.`);
   });
 }
 
 function dial() {
   hostConn = peer.connect('ludo-' + room, { reliable: true });
-  hostConn.on('open', () => { tries = 0; role = 'guest'; hostConn.send({ t: 'join', cid, name: joinName }); });
+  if (role !== 'guest') tHost = setTimeout(() => !hostConn.open && failJoin("Found the room but couldn't connect to the host. Try Wi-Fi on both devices, or ask the host to reopen the room."), 15000);
+  hostConn.on('open', () => { clearTimeout(tHost); tries = 0; role = 'guest'; busy(false); setStatus(''); hostConn.send({ t: 'join', cid, name: joinName }); });
   hostConn.on('data', onHostMsg);
   hostConn.on('close', () => role === 'guest' && retry());
 }
@@ -820,6 +848,9 @@ $('#join').onclick = () => {
   joinRoom(code);
 };
 $('#joinCode').addEventListener('keydown', e => e.key === 'Enter' && $('#join').click());
+// Dismiss the keyboard once the code is complete so the layout settles before the Join tap lands.
+$('#joinCode').addEventListener('input', e => { if (e.target.value.trim().length >= 5) e.target.blur(); });
+window.addEventListener('error', e => { if (!$('#status').hidden || $('#home').hidden) return; setStatus('Something went wrong: ' + (e.message || 'unknown error'), true); });
 $('#copy').onclick = async () => {
   const url = `${location.origin}${location.pathname}?room=${room}`;
   try { await navigator.clipboard.writeText(url); toast('Invite link copied'); } catch { toast(url); }

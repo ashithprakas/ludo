@@ -97,7 +97,7 @@
     background: linear-gradient(160deg, color-mix(in srgb, var(--pc) 78%, #fff), var(--pc)); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), 0 2px 6px color-mix(in srgb, var(--pc) 45%, transparent); }
   .c2 .avatar { color: #5c4400; }
   .avatar.sm { width: 34px; height: 34px; font-size: 15px; }
-  .roomcode { font-size: 50px; font-weight: 800; letter-spacing: .16em; text-align: center; padding: 18px 0 20px; padding-left: .16em; font-variant-numeric: tabular-nums; }
+  .roomcode { font-size: 44px; font-weight: 800; letter-spacing: .16em; text-align: center; padding: 18px 0 20px; padding-left: .16em; font-variant-numeric: tabular-nums; }
   .x { appearance: none; border: 0; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--label2) 22%, transparent); color: var(--label2); font-size: 16px; cursor: pointer; line-height: 1; transition: transform .3s var(--spring); }
   .x:active { transform: scale(.85); }
   .pop { animation: pop .5s var(--spring) both; }
@@ -198,7 +198,7 @@
     <div class="glass panel pop" id="friendsPanel" hidden>
       <button class="btn block" id="create">Create Room</button>
       <div class="group-title" style="margin:2px 0 -6px">or join with a code</div>
-      <div class="glass group" style="box-shadow:none"><label class="item"><input id="joinCode" class="code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go"></label></div>
+      <div class="glass group" style="box-shadow:none"><label class="item"><input id="joinCode" class="code" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go"></label></div>
       <button class="btn sec block" id="join">Join Room</button>
       <div id="status" class="status" role="status" hidden></div>
     </div>
@@ -250,7 +250,7 @@
 </main>
 <div id="toast"></div>
 
-<script src="peerjs.min.js"></script>
+<script src="mqtt.min.js"></script>
 <script src="game.js"></script>
 <script>
 'use strict';
@@ -269,19 +269,20 @@ const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => CODE
 const cid = store.get('ludo.cid', sessionStorage) || (() => { const c = rnd(16); store.set('ludo.cid', c, sessionStorage); return c; })();
 
 let role = null;          // 'host' | 'guest'
-let peer = null, hostConn = null, room = null;
+let mq = null, room = null;   // mq: MQTT client; room code = 5 random chars + 1 broker marker
 let H = null;             // host-only authoritative state {started, players, game}
-const guests = new Map(); // cid -> conn
+const guests = new Set(); // cids of connected guests
 let S = null;             // view state: {started, players, game}
 let me = -1;              // my index in S.players
 let timer = null;
-let solo = false;         // offline vs-computer: no PeerJS involved
-let joinName = '', tries = 0, leaving = false;
-const PEER_OPTS = { config: { iceServers: [
-  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
-  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
-] } };
+let solo = false;         // offline vs-computer: no network at all
+let joinName = '', leaving = false, tBroker = 0, tHost = 0;
+
+// Game messages travel over a public MQTT broker via secure WebSockets (plain web traffic), so players
+// on different networks, phones on mobile data and restrictive Wi-Fi all connect without NAT traversal.
+const BROKERS = { H: 'wss://broker.hivemq.com:8884/mqtt', E: 'wss://broker.emqx.io:8084/mqtt' };
+const NS = 'ludo-ashith-v1';
+const topic = (r, ...p) => [NS, r, ...p].join('/');
 
 /* ---------------- sound + haptics ---------------- */
 
@@ -320,7 +321,7 @@ function busy(on, label) {
   ['#create', '#join'].forEach(id => ($(id).disabled = on));
   $('#join').textContent = on && label ? label : 'Join Room';
 }
-const noNetLib = () => typeof Peer === 'undefined' && (setStatus('Networking failed to load. Check your connection and reload the page.', true), true);
+const noNetLib = () => typeof mqtt === 'undefined' && (setStatus('Networking failed to load. Check your connection and reload the page.', true), true);
 let wl = null;
 async function wake() { try { if (!wl && navigator.wakeLock && S) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => (wl = null)); } } catch {} }
 function unwake() { try { wl && wl.release(); } catch {} wl = null; }
@@ -329,18 +330,39 @@ function myName() { const n = $('#name').value.trim() || 'Player'; store.set('lu
 
 /* ---------------- networking ---------------- */
 
+const mqConnect = (url, opts) => mqtt.connect(url, { clientId: 'ludo_' + rnd(12), clean: true, connectTimeout: 8000, reconnectPeriod: 2000, keepalive: 30, ...opts });
+const send = (t, m) => mq && mq.connected && mq.publish(t, JSON.stringify(m), { qos: 1 });
+const sendHost = m => send(topic(room, 'h'), { ...m, cid });
+const toGuest = (id, m) => send(topic(room, 'g', id), m);
+const parse = b => { try { return JSON.parse(b.toString()); } catch { return null; } };
+
 function resetNet(msg) {
   leaving = true;
-  clearTimeout(timer);
-  try { peer && peer.destroy(); } catch {}
+  clearTimeout(timer); clearTimeout(tBroker); clearTimeout(tHost);
+  const c = mq, r = room, wasRole = role;
+  mq = null;
+  if (c) {
+    try {   // tell the room we're gone, then close
+      if (wasRole === 'host') c.publish(topic(r, 'status'), 'closed', { retain: true, qos: 1 });
+      else if (wasRole === 'guest') c.publish(topic(r, 'h'), JSON.stringify({ t: 'bye', cid }), { qos: 1 });
+    } catch {}
+    setTimeout(() => { try { c.end(true); } catch {} }, 500);
+  }
   unwake();
-  solo = false; role = peer = hostConn = H = S = room = null; me = -1; guests.clear();
+  solo = false; role = H = S = room = null; me = -1; guests.clear();
   $('#over').hidden = true; $('#tokens')?.remove(); lastRolls = 0; lastTurnKey = '';
   history.replaceState(null, '', location.pathname);
-  clearTimeout(tBroker); clearTimeout(tHost); busy(false); setStatus('');
+  busy(false); setStatus('');
   show('home');
   if (msg) toast(msg);
 }
+
+function failJoin(msg) {
+  resetNet();
+  setStatus(msg, true);
+  toast(msg.length > 60 ? msg.slice(0, 57) + '…' : msg);
+}
+const NO_SERVER = "Can't reach the game server. Your network may be blocking it. Try another network, or turn off any VPN or ad-blocker.";
 
 function createSolo(bots) {
   const name = myName();
@@ -350,15 +372,26 @@ function createSolo(bots) {
   startGame();
 }
 
-function createRoom() {
+function createRoom(markers = Object.keys(BROKERS), idx = 0) {
   if (noNetLib()) return;
   const name = myName();
-  room = rnd(5); leaving = false;
+  leaving = false;
   busy(true); setStatus('Creating room…');
-  peer = new Peer('ludo-' + room, PEER_OPTS);
-  const giveUp = setTimeout(() => role !== 'host' && failJoin("Can't reach the game server. Your network may be blocking it. Try another network, or turn off any VPN or ad-blocker."), 10000);
-  peer.on('open', () => {
-    clearTimeout(giveUp); busy(false); setStatus('');
+  room = rnd(5) + markers[idx];
+  const mine = room;
+  mq = mqConnect(BROKERS[markers[idx]], { will: { topic: topic(mine, 'status'), payload: 'closed', retain: true, qos: 1 } });
+  const c = mq;
+  let ready = false;
+  const giveUp = setTimeout(() => {                    // this broker is unreachable: try the next one
+    try { c.end(true); } catch {}
+    if (idx + 1 < markers.length) createRoom(markers, idx + 1); else failJoin(NO_SERVER);
+  }, 9000);
+  c.on('connect', () => {
+    c.subscribe(topic(mine, 'h'), { qos: 1 });
+    c.publish(topic(mine, 'status'), 'open', { retain: true, qos: 1 });   // re-announce after any reconnect
+    if (ready) return;
+    ready = true; clearTimeout(giveUp);
+    busy(false); setStatus('');
     role = 'host';
     H = { started: false, players: [mkPlayer(name, cid)], game: null };
     H.players[0].host = true;
@@ -366,63 +399,47 @@ function createRoom() {
     show('lobby');
     commit();
   });
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
-  peer.on('connection', c => {
-    c.on('data', m => onGuestMsg(c, m));
-    c.on('close', () => onGuestClose(c));
-  });
-  peer.on('error', e => {
-    if (e.type === 'unavailable-id') { peer.destroy(); createRoom(); }
-    else if (role === 'host') toast('Network error: ' + e.type);
-    else { clearTimeout(giveUp); failJoin('Could not create a room (' + e.type + '). Try again.'); }
-  });
+  c.on('message', (t, payload) => { const m = parse(payload); if (m && H && t === topic(mine, 'h')) onGuestMsg(m); });
+  c.on('error', () => {});
 }
 
-function failJoin(msg) {
-  resetNet();
-  setStatus(msg, true);
-  toast(msg.length > 60 ? msg.slice(0, 57) + '…' : msg);
-}
-
-let tBroker = 0, tHost = 0;
 function joinRoom(code) {
   if (noNetLib()) return;
-  joinName = myName(); room = code; leaving = false; tries = 0;
+  const url = BROKERS[code[5]];
+  if (!url) return setStatus("That code doesn't look right. Room codes are 6 characters.", true);
+  joinName = myName(); room = code; leaving = false;
   busy(true, 'Connecting…'); setStatus('Connecting to the game server…');
-  peer = new Peer(PEER_OPTS);
-  clearTimeout(tBroker); clearTimeout(tHost);
-  tBroker = setTimeout(() => failJoin("Can't reach the game server. Your network may be blocking it. Try another network, or turn off any VPN or ad-blocker."), 10000);
-  peer.on('open', () => { clearTimeout(tBroker); setStatus(`Looking for room ${code}…`); dial(); });
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
-  peer.on('error', e => {
-    if (role === 'guest' && e.type !== 'peer-unavailable') return retry();   // already in a room: try to recover
-    clearTimeout(tBroker); clearTimeout(tHost);
-    failJoin(e.type === 'peer-unavailable' ? `Room ${code} not found. Check the code, and make sure the host still has the game open.` : `Connection error (${e.type}). Try again.`);
+  mq = mqConnect(url, { will: { topic: topic(code, 'h'), payload: JSON.stringify({ t: 'bye', cid }), qos: 1 } });
+  const c = mq;
+  tBroker = setTimeout(() => failJoin(NO_SERVER), 10000);
+  const notFound = () => failJoin(`Room ${code} not found. Check the code, and make sure the host still has the game open.`);
+  c.on('connect', () => {
+    clearTimeout(tBroker);
+    c.subscribe([topic(code, 'status'), topic(code, 'g', cid)], { qos: 1 });
+    if (role !== 'guest') { setStatus(`Looking for room ${code}…`); clearTimeout(tHost); tHost = setTimeout(notFound, 6000); }
+    else { sendHost({ t: 'join', name: joinName }); toast('Reconnected'); }   // reclaim our seat after a drop
   });
+  c.on('message', (t, payload) => {
+    const v = payload.toString();
+    if (t === topic(code, 'status')) {
+      if (v === 'open') sendHost({ t: 'join', name: joinName });
+      else if (v === 'closed') role === 'guest' ? resetNet('Host left the room') : (clearTimeout(tHost), notFound());
+      return;
+    }
+    const m = parse(payload);
+    if (!m) return;
+    if (m.t === 'sync' && role !== 'guest') { role = 'guest'; clearTimeout(tHost); busy(false); setStatus(''); }
+    if (m.t === 'err' && role !== 'guest') { clearTimeout(tHost); return failJoin(m.m); }
+    onHostMsg(m);
+  });
+  c.on('offline', () => role === 'guest' && toast('Reconnecting…'));
+  c.on('error', () => {});
 }
 
-function dial() {
-  hostConn = peer.connect('ludo-' + room, { reliable: true });
-  if (role !== 'guest') tHost = setTimeout(() => !hostConn.open && failJoin("Found the room but couldn't connect to the host. Try Wi-Fi on both devices, or ask the host to reopen the room."), 15000);
-  hostConn.on('open', () => { clearTimeout(tHost); tries = 0; role = 'guest'; busy(false); setStatus(''); hostConn.send({ t: 'join', cid, name: joinName }); });
-  hostConn.on('data', onHostMsg);
-  hostConn.on('close', () => role === 'guest' && retry());
-}
-
-// Phones drop connections when the tab is backgrounded; rejoin with the same cid to get the seat back.
-function retry() {
-  if (role !== 'guest' || leaving) return;
-  if (tries++ >= 8) return resetNet('Lost connection to the host');
-  toast('Reconnecting…');
-  setTimeout(() => {
-    if (role !== 'guest') return;
-    if (peer.destroyed) { peer = new Peer(PEER_OPTS); peer.on('open', dial); peer.on('error', retry); }
-    else if (peer.disconnected) { peer.once('open', dial); try { peer.reconnect(); } catch { retry(); } }
-    else dial();
-  }, 1500);
-}
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { if (role === 'guest' && !(hostConn && hostConn.open)) retry(); wake(); }
+  if (document.visibilityState !== 'visible') return;
+  if (mq && !mq.connected) { try { mq.reconnect(); } catch {} }   // phones suspend sockets in the background
+  wake();
 });
 
 function onHostMsg(m) {
@@ -435,37 +452,30 @@ function onHostMsg(m) {
   }
 }
 
-function onGuestMsg(c, m) {
+function onGuestMsg(m) {
+  const id = m.cid;
+  if (typeof id !== 'string' || id.length > 40) return;
+  const i = H.players.findIndex(p => p.cid === id);
   if (m.t === 'join') {
-    let i = H.players.findIndex(p => p.cid === m.cid);
     if (i < 0) {
-      if (H.started) return c.send({ t: 'err', m: 'Game already in progress' });
-      if (H.players.length >= 4) return c.send({ t: 'err', m: 'Room is full' });
-      H.players.push(mkPlayer(String(m.name).slice(0, 14), m.cid));
+      if (H.started) return toGuest(id, { t: 'err', m: 'Game already in progress' });
+      if (H.players.length >= 4) return toGuest(id, { t: 'err', m: 'Room is full' });
+      H.players.push(mkPlayer(String(m.name).slice(0, 14), id));
     } else {
       H.players[i].connected = true;
     }
-    c.cid = m.cid;
-    const old = guests.get(m.cid);
-    guests.set(m.cid, c);
-    if (old && old !== c) try { old.close(); } catch {}
+    guests.add(id);
     commit();
-    return;
+  } else if (m.t === 'bye') {
+    guests.delete(id);
+    if (i < 0) return;
+    if (H.started) H.players[i].connected = false;
+    else H.players.splice(i, 1);
+    commit();
+  } else if (i >= 0) {
+    if (m.t === 'roll') hostRoll(i);
+    else if (m.t === 'move') hostMove(i, m.i);
   }
-  const i = H.players.findIndex(p => p.cid === c.cid);
-  if (i < 0) return;
-  if (m.t === 'roll') hostRoll(i);
-  else if (m.t === 'move') hostMove(i, m.i);
-}
-
-function onGuestClose(c) {
-  if (!c.cid || guests.get(c.cid) !== c || !H) return;
-  guests.delete(c.cid);
-  const i = H.players.findIndex(p => p.cid === c.cid);
-  if (i < 0) return;
-  if (H.started) H.players[i].connected = false;
-  else H.players.splice(i, 1);
-  commit();
 }
 
 /* ---------------- host logic ---------------- */
@@ -485,7 +495,7 @@ const pub = () => {
 
 function commit() {
   S = pub(); me = H.players.findIndex(p => p.cid === cid);
-  guests.forEach((c, id) => c.open && c.send({ t: 'sync', st: S, you: H.players.findIndex(p => p.cid === id) }));
+  guests.forEach(id => toGuest(id, { t: 'sync', st: S, you: H.players.findIndex(p => p.cid === id) }));
   render();
   schedule();
 }
@@ -697,7 +707,7 @@ function onTokenClick(color, ti) {
   if (!g || g.phase !== 'move' || g.turn !== me || g.players[me].color !== color) return;
   if (!Ludo.legalMoves(g).includes(ti)) return;
   buzz(12);
-  if (role === 'host') hostMove(me, ti); else hostConn.send({ t: 'move', i: ti });
+  if (role === 'host') hostMove(me, ti); else sendHost({ t: 'move', i: ti });
 }
 
 /* ---------------- rendering ---------------- */
@@ -823,7 +833,7 @@ function renderLobby() {
 
 $('#name').value = store.get('ludo.name') || '';
 const urlRoom = new URLSearchParams(location.search).get('room');
-if (urlRoom) $('#joinCode').value = urlRoom.toUpperCase().slice(0, 5);
+if (urlRoom) $('#joinCode').value = urlRoom.toUpperCase().slice(0, 6);
 
 let selBots = 1;
 const paintSeg = () => {
@@ -841,15 +851,15 @@ $('#seg').onclick = e => { const n = +(e.target.dataset && e.target.dataset.bots
 $('#playCpu').onclick = () => createSolo(selBots);
 if (urlRoom) pick('friends');
 
-$('#create').onclick = createRoom;
+$('#create').onclick = () => createRoom();
 $('#join').onclick = () => {
   const code = $('#joinCode').value.trim().toUpperCase();
-  if (code.length !== 5) return toast('Enter the 5-character room code');
+  if (code.length !== 6) return toast('Enter the 6-character room code');
   joinRoom(code);
 };
 $('#joinCode').addEventListener('keydown', e => e.key === 'Enter' && $('#join').click());
 // Dismiss the keyboard once the code is complete so the layout settles before the Join tap lands.
-$('#joinCode').addEventListener('input', e => { if (e.target.value.trim().length >= 5) e.target.blur(); });
+$('#joinCode').addEventListener('input', e => { if (e.target.value.trim().length >= 6) e.target.blur(); });
 window.addEventListener('error', e => { if (!$('#status').hidden || $('#home').hidden) return; setStatus('Something went wrong: ' + (e.message || 'unknown error'), true); });
 $('#copy').onclick = async () => {
   const url = `${location.origin}${location.pathname}?room=${room}`;
@@ -868,7 +878,7 @@ $('#start').onclick = startGame;
 $('#boardWrap').addEventListener('click', e => {
   if (!e.target.closest('.die.rollable')) return;
   buzz(15);
-  if (role === 'host') hostRoll(me); else hostConn.send({ t: 'roll' });
+  if (role === 'host') hostRoll(me); else sendHost({ t: 'roll' });
 });
 $('#again').onclick = backToLobby;
 $('#leaveLobby').onclick = () => resetNet();

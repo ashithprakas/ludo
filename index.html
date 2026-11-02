@@ -502,12 +502,18 @@ const HOME = [
 ];
 const QUAD = [[0, 0], [9, 0], [9, 9], [0, 9]];
 const SLOT = [[2, 2], [4, 2], [2, 4], [4, 4]];
-const FIN_OFF = [[-.75, 0], [0, -.75], [.75, 0], [0, .75]];
+const FIN_DIR = [[-1, 0], [0, -1], [1, 0], [0, 1]];   // toward each color's own triangle
+// Four finished pieces sit in a row inside their color's triangle, never on top of each other.
+const finSlot = (color, k) => {
+  const [dx, dy] = FIN_DIR[color], l = (k - 1.5) * .62, d = 1.1;
+  return [dx * d + dy * l, dy * d + dx * l];
+};
 
 function drawBoard() {
   const svg = $('#board');
   svg.innerHTML = `<defs>
     <radialGradient id="shine" cx=".34" cy=".28" r=".62"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".45" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bodyShade" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".34"/></linearGradient>
     <radialGradient id="shade" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></radialGradient></defs>`;
   const bg = el('g', {}, svg);
   QUAD.forEach(([qx, qy], c) => {
@@ -543,7 +549,7 @@ function tokenXY(color, pos, ti) {
   if (pos === -1) return [QUAD[color][0] + SLOT[ti][0], QUAD[color][1] + SLOT[ti][1]];
   if (pos <= 50) { const [c, r] = PATH[Ludo.abs(color, pos)]; return [c + .5, r + .5]; }
   if (pos < 56) { const [c, r] = HOME[color][pos - 51]; return [c + .5, r + .5]; }
-  return [7.5 + FIN_OFF[color][0] * .55, 7.5 + FIN_OFF[color][1] * .55];
+  return [7.5, 7.5]; // finished pieces are fanned out by finSlot()
 }
 
 function place(node, pos, ms) {
@@ -579,13 +585,19 @@ function makeToken(layer, pl, ti) {
   const id = `tok-${pl.color}-${ti}`;
   const node = el('g', { id, class: 'tok' }, layer);
   node._color = pl.color; node._ti = ti; node._ox = node._oy = 0; node._sc = 1;
-  el('ellipse', { cx: 0, cy: .33, rx: .3, ry: .1, class: 'shadow' }, node);
+  const c = pl.color;
+  el('ellipse', { cx: 0, cy: .34, rx: .34, ry: .1, class: 'shadow' }, node);
   const ball = el('g', { class: 'ball' }, node);
-  el('circle', { r: .5, class: `halo f${pl.color}` }, ball);
-  el('circle', { r: .37, class: `f${pl.color}` }, ball);
-  el('circle', { r: .37, fill: 'url(#shade)' }, ball);
-  el('circle', { r: .37, fill: 'url(#shine)' }, ball);
-  el('circle', { r: .37, class: 'rim' }, ball);
+  el('ellipse', { cx: 0, cy: .3, rx: .46, ry: .2, class: `halo f${c}` }, ball);
+  // pawn: base disc, flared body, collar, head
+  el('ellipse', { cx: 0, cy: .3, rx: .31, ry: .1, class: `f${c}` }, ball);
+  el('ellipse', { cx: 0, cy: .3, rx: .31, ry: .1, fill: '#000', opacity: .28 }, ball);
+  const body = 'M-.27,.29 C-.22,.1 -.12,-.06 -.09,-.14 L.09,-.14 C.12,-.06 .22,.1 .27,.29 Z';
+  el('path', { d: body, class: `f${c}` }, ball);
+  el('path', { d: body, fill: 'url(#bodyShade)' }, ball);
+  el('ellipse', { cx: 0, cy: -.14, rx: .15, ry: .05, class: `f${c}` }, ball);
+  el('ellipse', { cx: 0, cy: -.14, rx: .15, ry: .05, fill: '#fff', opacity: .38 }, ball);
+  [`f${c}`, null, null].forEach((cls, k) => el('circle', { cx: 0, cy: -.3, r: .19, ...(cls ? { class: cls } : { fill: `url(#${k === 1 ? 'shade' : 'shine'})` }) }, ball));
   node._ball = ball;
   node.addEventListener('click', () => onTokenClick(pl.color, ti));
   return node;
@@ -605,9 +617,13 @@ function renderBoard(g, legal) {
     seen.add(id);
     let node = document.getElementById(id), fresh = !node;
     if (fresh) node = makeToken(layer, t.pl, t.ti);
-    const stacked = list.length > 1 && t.pos !== -1;
-    [node._ox, node._oy] = stacked ? offs[k % 4] : [0, 0];
-    node._sc = stacked ? .74 : 1;
+    const finished = t.pos === Ludo.FIN;
+    const stacked = list.length > 1 && t.pos !== -1 && !finished;
+    if (finished) {
+      const rank = g.tokens[t.pi].slice(0, t.ti).filter(x => x === Ludo.FIN).length;
+      [node._ox, node._oy] = finSlot(t.pl.color, rank);
+    } else [node._ox, node._oy] = stacked ? offs[k % 4] : [0, 0];
+    node._sc = finished ? .5 : stacked ? .74 : 1;
     node._target = t.pos;
     if (fresh) { node._cur = t.pos; place(node, t.pos, 0); }
     else if (node._cur !== node._target) drive(node);

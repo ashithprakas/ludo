@@ -18,7 +18,7 @@
     --spring: cubic-bezier(.34, 1.56, .64, 1); --ease: cubic-bezier(.2, .9, .25, 1);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #000; --bg2: #1c1c1e; --glass: rgba(44,44,46,.72); --glassLine: rgba(235,235,245,.14);
       --label: #f5f5f7; --label2: rgba(235,235,245,.6); --accent: #0a84ff;
       --c0: #ff453a; --c1: #30d158; --c2: #ffd60a; --c3: #0a84ff;
@@ -26,6 +26,15 @@
       --shadow: 0 10px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.05);
     }
   }
+  :root[data-theme="dark"] {
+      --bg: #000; --bg2: #1c1c1e; --glass: rgba(44,44,46,.72); --glassLine: rgba(235,235,245,.14);
+      --label: #f5f5f7; --label2: rgba(235,235,245,.6); --accent: #0a84ff;
+      --c0: #ff453a; --c1: #30d158; --c2: #ffd60a; --c3: #0a84ff;
+      --cell: #2c2c2e; --cellLine: #1c1c1e; --slot: #3a3a3c; --star: #636366; --boardBg: #1c1c1e;
+      --shadow: 0 10px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.05);
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; min-height: 100vh; color: var(--label); background: var(--bg);
@@ -99,7 +108,7 @@
     background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: .5px solid var(--glassLine);
     transition: transform .5s var(--spring), box-shadow .4s, opacity .3s; opacity: .62; }
   .badge.right { flex-direction: row-reverse; padding: 6px 6px 6px 8px; text-align: right; }
-  .badge.active { opacity: 1; transform: scale(1.03); box-shadow: 0 0 0 2.5px var(--pc), 0 8px 26px color-mix(in srgb, var(--pc) 40%, transparent); }
+  .badge.active { flex-grow: 1.6; max-width: none; opacity: 1; transform: scale(1.03); box-shadow: 0 0 0 2.5px var(--pc), 0 8px 26px color-mix(in srgb, var(--pc) 40%, transparent); }
   .badge .avatar { width: 46px; height: 46px; }
   .corners[data-n="1"] .badge { max-width: 100%; }
   .info { flex: 1; min-width: 0; }
@@ -141,7 +150,7 @@
   #msg { text-align: center; font-weight: 600; margin: 14px 0 2px; min-height: 1.4em; transition: opacity .25s; }
   #msg.swap { opacity: 0; }
   #hint { text-align: center; color: var(--accent); font-weight: 650; min-height: 1.4em; }
-  .bar { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .bar { display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 6px; }
   .round, .btn.glass.round { width: 44px; height: 44px; border-radius: 50%; padding: 0; display: grid; place-items: center; color: var(--accent); background: var(--glass); }
   .round svg { width: 22px; height: 22px; }
   #over { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.35); animation: fade .35s both; }
@@ -166,8 +175,9 @@
 <body>
 <main>
   <section id="home" class="view">
-    <h1>Ludo</h1>
-    <p class="lead">Roll, race and send friends home.</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1>Ludo</h1>
+    <p class="lead">Roll, race and send friends home.</p></div>
+      <button class="btn glass round themeBtn" aria-label="Toggle dark mode" style="margin-top:28px"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 14.5A9 9 0 119.5 3a7 7 0 0011.5 11.5z"/></svg></button></div>
 
     <div class="glass group"><label class="item"><span style="color:var(--label2)">Name</span><input id="name" maxlength="14" placeholder="Your name" autocomplete="off" style="text-align:right"></label></div>
 
@@ -218,7 +228,8 @@
       <div id="msg"></div>
       <div id="hint"></div>
       <div class="bar">
-        <button id="leaveGame" class="btn plain danger">Leave</button>
+        <button id="leaveGame" class="btn plain danger" style="margin-right:auto">Leave</button>
+        <button class="btn glass round themeBtn" aria-label="Toggle dark mode"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 14.5A9 9 0 119.5 3a7 7 0 0011.5 11.5z"/></svg></button>
         <button id="mute" class="btn glass round" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><g id="waves" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 8.5a5 5 0 010 7M18.6 6a8.6 8.6 0 010 12"/></g><path id="slash" d="M17 9l5 6m0-6l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" hidden/></svg></button>
       </div>
     </div>
@@ -285,7 +296,7 @@ const sfx = {
   capture() { tone(220, .2, 'sawtooth', .04); tone(150, .28, 'sawtooth', .04, .08); },
   win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .3, 'sine', .07, i * .1)); },
 };
-const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+const buzz = ms => { try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(ms); } catch {} };
 function paintMute() { $('#slash').hidden = !muted; $('#waves').style.display = muted ? 'none' : ''; }
 
 function toast(m) {
@@ -663,7 +674,7 @@ function renderBadges(g) {
     die.disabled = !rollable;
     die.classList.toggle('rollable', rollable);
     if (active) {
-      const v = g.phase === 'roll' ? 0 : g.dice;
+      const v = g.dice || 5; // idle die keeps the last roll rather than a blank face
       setDie(die, v, rolled && g.phase === 'move' && !die._busy);
     }
   });
@@ -791,6 +802,18 @@ $('#leaveOver').onclick = () => resetNet();
 $('#leaveGame').onclick = () => confirm('Leave this game?') && resetNet();
 $('#mute').onclick = () => { muted = !muted; store.set('ludo.mute', muted ? '1' : '0'); paintMute(); if (!muted) sfx.step(3); };
 paintMute();
+
+const root = document.documentElement;
+const sysDark = matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : sysDark.matches;
+const paintTheme = () => document.querySelectorAll('meta[name=theme-color]').forEach(m => m.setAttribute('content', isDark() ? '#000000' : '#f2f2f7'));
+const savedTheme = store.get('ludo.theme');
+if (savedTheme) root.dataset.theme = savedTheme;
+paintTheme();
+document.querySelectorAll('.themeBtn').forEach(b => (b.onclick = () => {
+  const next = isDark() ? 'light' : 'dark';
+  root.dataset.theme = next; store.set('ludo.theme', next); paintTheme();
+}));
 </script>
 </body>
 </html>

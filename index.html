@@ -102,7 +102,7 @@
   @keyframes pop { from { opacity: 0; transform: scale(.8); } }
 
   /* ---------- game ---------- */
-  #boardWrap { width: min(100%, calc(100vh - 230px), 620px); margin: 0 auto; }
+  #boardWrap { width: min(100%, calc(100vh - 230px), 620px); width: min(100%, calc(100dvh - 230px), 620px); margin: 0 auto; }
   .corners { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0; min-height: 62px; }
   .badge { flex: 1 1 0; min-width: 0; max-width: calc(50% - 5px); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 6px; border-radius: 999px;
     background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: .5px solid var(--glassLine);
@@ -273,6 +273,12 @@ let S = null;             // view state: {started, players, game}
 let me = -1;              // my index in S.players
 let timer = null;
 let solo = false;         // offline vs-computer: no PeerJS involved
+let joinName = '', tries = 0, leaving = false;
+const PEER_OPTS = { config: { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+] } };
 
 /* ---------------- sound + haptics ---------------- */
 
@@ -303,14 +309,19 @@ function toast(m) {
   const t = $('#toast'); t.textContent = m; t.classList.add('show');
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2800);
 }
-function show(id) { ['home', 'lobby', 'game'].forEach(s => ($('#' + s).hidden = s !== id)); }
+let wl = null;
+async function wake() { try { if (!wl && navigator.wakeLock && S) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => (wl = null)); } } catch {} }
+function unwake() { try { wl && wl.release(); } catch {} wl = null; }
+function show(id) { ['home', 'lobby', 'game'].forEach(s => ($('#' + s).hidden = s !== id)); if (id !== 'home') wake(); }
 function myName() { const n = $('#name').value.trim() || 'Player'; store.set('ludo.name', n); return n; }
 
 /* ---------------- networking ---------------- */
 
 function resetNet(msg) {
+  leaving = true;
   clearTimeout(timer);
   try { peer && peer.destroy(); } catch {}
+  unwake();
   solo = false; role = peer = hostConn = H = S = room = null; me = -1; guests.clear();
   $('#over').hidden = true; $('#tokens')?.remove(); lastRolls = 0; lastTurnKey = '';
   history.replaceState(null, '', location.pathname);
@@ -329,7 +340,7 @@ function createSolo(bots) {
 function createRoom() {
   const name = myName();
   room = rnd(5);
-  peer = new Peer('ludo-' + room);
+  peer = new Peer('ludo-' + room, PEER_OPTS);
   peer.on('open', () => {
     role = 'host';
     H = { started: false, players: [mkPlayer(name, cid)], game: null };
@@ -338,6 +349,7 @@ function createRoom() {
     show('lobby');
     commit();
   });
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
   peer.on('connection', c => {
     c.on('data', m => onGuestMsg(c, m));
     c.on('close', () => onGuestClose(c));
@@ -350,25 +362,40 @@ function createRoom() {
 }
 
 function joinRoom(code) {
-  const name = myName();
-  room = code;
-  peer = new Peer();
-  const fail = setTimeout(() => resetNet("Couldn't reach that room"), 12000);
-  peer.on('open', () => {
-    hostConn = peer.connect('ludo-' + code, { reliable: true });
-    hostConn.on('open', () => {
-      clearTimeout(fail);
-      role = 'guest';
-      hostConn.send({ t: 'join', cid, name });
-    });
-    hostConn.on('data', onHostMsg);
-    hostConn.on('close', () => role === 'guest' && resetNet('Host left the room'));
-  });
+  joinName = myName(); room = code; leaving = false; tries = 0;
+  peer = new Peer(PEER_OPTS);
+  const fail = setTimeout(() => !hostConn?.open && resetNet("Couldn't connect. Check the code and that the host still has the game open."), 15000);
+  peer.on('open', () => { clearTimeout(fail); dial(); });
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
   peer.on('error', e => {
+    if (role === 'guest' && e.type !== 'peer-unavailable') return retry();   // already in a room: try to recover
     clearTimeout(fail);
     resetNet(e.type === 'peer-unavailable' ? `Room ${code} not found` : 'Network error: ' + e.type);
   });
 }
+
+function dial() {
+  hostConn = peer.connect('ludo-' + room, { reliable: true });
+  hostConn.on('open', () => { tries = 0; role = 'guest'; hostConn.send({ t: 'join', cid, name: joinName }); });
+  hostConn.on('data', onHostMsg);
+  hostConn.on('close', () => role === 'guest' && retry());
+}
+
+// Phones drop connections when the tab is backgrounded; rejoin with the same cid to get the seat back.
+function retry() {
+  if (role !== 'guest' || leaving) return;
+  if (tries++ >= 8) return resetNet('Lost connection to the host');
+  toast('Reconnecting…');
+  setTimeout(() => {
+    if (role !== 'guest') return;
+    if (peer.destroyed) { peer = new Peer(PEER_OPTS); peer.on('open', dial); peer.on('error', retry); }
+    else if (peer.disconnected) { peer.once('open', dial); try { peer.reconnect(); } catch { retry(); } }
+    else dial();
+  }, 1500);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { if (role === 'guest' && !(hostConn && hostConn.open)) retry(); wake(); }
+});
 
 function onHostMsg(m) {
   if (m.t === 'sync') {

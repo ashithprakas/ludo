@@ -37,14 +37,16 @@
   :root[data-theme="dark"] { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; min-height: 100vh; color: var(--label); background: var(--bg);
+  body { margin: 0; min-height: 100vh; min-height: 100dvh; color: var(--label); background: var(--bg);
     font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased; }
   body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: radial-gradient(60vmax 40vmax at 15% -10%, color-mix(in srgb, var(--c3) 16%, transparent), transparent),
                 radial-gradient(50vmax 40vmax at 100% 0%, color-mix(in srgb, var(--c0) 12%, transparent), transparent),
                 radial-gradient(60vmax 40vmax at 50% 110%, color-mix(in srgb, var(--c1) 12%, transparent), transparent); }
-  main { max-width: 560px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); }
+  main { --padT: max(14px, env(safe-area-inset-top)); --padB: max(14px, env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; padding: var(--padT) 16px var(--padB); }
+  html { scrollbar-width: none; } html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+  body.ingame { overflow: hidden; }
   [hidden] { display: none !important; }
   .view { animation: enter .32s var(--ease) both; }
   @keyframes enter { from { opacity: 0; transform: translateY(14px) scale(.985); } }
@@ -104,8 +106,10 @@
   @keyframes pop { from { opacity: 0; transform: scale(.8); } }
 
   /* ---------- game ---------- */
-  #boardWrap { width: min(100%, calc(100vh - 230px), 620px); width: min(100%, calc(100dvh - 230px), 620px); margin: 0 auto; }
-  .corners { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0; min-height: 70px; }
+  #game:not([hidden]) { height: calc(100vh - var(--padT) - var(--padB)); height: calc(100dvh - var(--padT) - var(--padB)); }
+  #boardWrap { width: 100%; max-width: 620px; height: 100%; margin: 0 auto; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto auto; }
+  #boardBox { container-type: size; display: grid; place-items: center; min-width: 0; min-height: 0; }
+  .corners { display: flex; justify-content: space-between; gap: 10px; margin: 6px 0; min-height: 64px; }
   .badge { flex: 1 1 0; min-width: 0; max-width: calc(50% - 5px); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 6px; border-radius: 999px;
     background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: .5px solid var(--glassLine);
     transition: transform .3s var(--spring), box-shadow .25s, opacity .2s; opacity: .62; }
@@ -136,7 +140,7 @@
   .pips i { place-self: center; width: 9.5px; height: 9.5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #555, #111); transform: scale(0); transition: transform .25s var(--spring); }
   .pips i.on { transform: scale(1); }
 
-  #board { width: 100%; aspect-ratio: 1; display: block; border-radius: 26px; background: var(--boardBg); box-shadow: var(--shadow); touch-action: manipulation; }
+  #board { width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); display: block; border-radius: 26px; background: var(--boardBg); box-shadow: var(--shadow); touch-action: manipulation; }
   .f0 { fill: var(--c0); } .f1 { fill: var(--c1); } .f2 { fill: var(--c2); } .f3 { fill: var(--c3); }
   .cell { fill: var(--cell); stroke: var(--cellLine); stroke-width: .03; }
   .hc { fill-opacity: .92; }
@@ -157,10 +161,10 @@
   @keyframes halo { from { transform: scale(.88); opacity: 1; } to { transform: scale(1.14); opacity: .5; } }
   @keyframes lift { from { transform: translateY(0); } to { transform: translateY(-.14px); } }
 
-  #msg { text-align: center; font-weight: 600; margin: 14px 0 2px; min-height: 1.4em; transition: opacity .15s; }
+  #msg { text-align: center; font-weight: 600; font-size: 15px; line-height: 1.3; margin: 8px 0 0; min-height: 2.6em; display: flex; align-items: center; justify-content: center; transition: opacity .15s; }
   #msg.swap { opacity: 0; }
-  #hint { text-align: center; color: var(--accent); font-weight: 650; min-height: 1.4em; }
-  .bar { display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 6px; }
+  #hint { text-align: center; color: var(--accent); font-weight: 650; font-size: 15px; min-height: 1.4em; }
+  .bar { display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 2px; }
   .round, .btn.glass.round { width: 44px; height: 44px; border-radius: 50%; padding: 0; display: grid; place-items: center; color: var(--accent); background: var(--glass); }
   .round svg { width: 22px; height: 22px; }
   #over { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.35); animation: fade .35s both; }
@@ -179,18 +183,58 @@
   #toast { position: fixed; left: 50%; top: max(14px, env(safe-area-inset-top)); transform: translate(-50%, -80px); z-index: 40; padding: 12px 20px; border-radius: 999px; font-weight: 600; font-size: 15px;
     background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: .5px solid var(--glassLine); box-shadow: var(--shadow); transition: transform .32s var(--spring); max-width: 92vw; }
   #toast.show { transform: translate(-50%, 0); }
+  @media (max-height: 740px) {
+    h1 { font-size: 36px; margin: 10px 0 2px; } .lead { font-size: 17px; margin-bottom: 14px; }
+    .group-title { margin-top: 14px; } .tile { min-height: 112px; padding: 14px; } .tile svg { width: 36px; height: 36px; }
+    .roomcode { font-size: 38px; padding: 10px 0 12px; padding-left: .16em; } .item { min-height: 46px; padding: 8px 14px; }
+    .btn { padding: 13px 18px; } .panel { padding: 14px; gap: 10px; margin-top: 10px; }
+    .corners { min-height: 56px; } .badge .avatar { width: 38px; height: 38px; font-size: 16px; } .die { width: 46px; height: 46px; padding: 5px; }
+    #msg { min-height: 2.4em; margin-top: 4px; } .round { width: 40px; height: 40px; } .btn.plain { padding: 8px 12px; }
+  }
+  @media (max-height: 600px) {
+    h1 { font-size: 30px; margin: 6px 0 0; } .lead { font-size: 15px; margin-bottom: 8px; }
+    .tile { min-height: 92px; } .tile b { font-size: 16px; } .tile small { display: none; }
+    .roomcode { font-size: 32px; padding: 6px 0 8px; padding-left: .16em; } .group-title { margin: 8px 14px 4px; }
+    .corners { min-height: 50px; } .badge .avatar { width: 34px; height: 34px; } .die { width: 42px; height: 42px; } .st { display: none; }
+  }
+  /* phones held sideways: board on the left, players and controls stacked on the right */
+  @media (orientation: landscape) and (max-height: 520px) {
+    main { max-width: none; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+    #boardWrap { max-width: none; grid-template-columns: calc(100vh - var(--padT) - var(--padB)) minmax(0, 1fr); grid-template-columns: calc(100dvh - var(--padT) - var(--padB)) minmax(0, 1fr); grid-template-rows: auto auto auto auto 1fr; column-gap: 14px; align-content: start; }
+    #boardWrap > :nth-child(2) { grid-column: 1; grid-row: 1 / -1; }
+    #boardWrap > :nth-child(1) { grid-column: 2; grid-row: 1; } #boardWrap > :nth-child(3) { grid-column: 2; grid-row: 2; }
+    #boardWrap > :nth-child(4) { grid-column: 2; grid-row: 3; } #boardWrap > :nth-child(5) { grid-column: 2; grid-row: 4; }
+    #boardWrap > :nth-child(6) { grid-column: 2; grid-row: 5; align-self: end; }
+    .corners { flex-direction: column; min-height: 0; margin: 4px 0; } .corners .badge, .corners[data-n="1"] .badge { max-width: 100%; flex: none; }
+    #msg { min-height: 0; margin: 4px 0 0; } .tg { display: inline; } .st { display: block; }
+    #home, #lobby { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); column-gap: 18px; align-content: start; }
+    #home .themeBtn { margin-top: 6px !important; } h1 { margin-top: 4px; }
+    .tile { min-height: 70px; flex-direction: row; align-items: center; gap: 10px; } .tile svg { width: 30px; height: 30px; flex: none; } .tile small { display: none; }
+    .panel { padding: 10px; gap: 8px; margin-top: 8px; } .group-title { margin: 6px 14px 4px; }
+  }
+  /* very short landscape screens */
+  @media (orientation: landscape) and (max-height: 400px) {
+    h1 { font-size: 26px; margin: 2px 0 0; } .lead { display: none; }
+    .item { min-height: 36px; padding: 4px 12px; } .avatar.sm { width: 28px; height: 28px; font-size: 13px; }
+    .roomcode { font-size: 26px; padding: 2px 0 4px; padding-left: .16em; } .btn { padding: 9px 14px; font-size: 15px; }
+    .btn.plain { padding: 6px 10px; } .group-title { margin: 4px 14px 2px; } .panel { padding: 8px; gap: 6px; margin-top: 6px; }
+    .tile { min-height: 58px; padding: 10px; } #hostControls { margin-top: 10px !important; } #leaveLobby { margin-top: 2px !important; }
+    #lobby .glass > div[style] { padding-bottom: 8px !important; } #home .themeBtn { width: 36px; height: 36px; }
+  }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>
 </head>
 <body>
 <main>
   <section id="home" class="view">
+    <div class="c1">
     <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1>Ludo</h1>
     <p class="lead">Roll, race and send friends home.</p></div>
       <button class="btn glass round themeBtn" aria-label="Toggle dark mode" style="margin-top:28px"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 14.5A9 9 0 119.5 3a7 7 0 0011.5 11.5z"/></svg></button></div>
 
     <div class="glass group"><label class="item"><span style="color:var(--label2)">Name</span><input id="name" maxlength="14" placeholder="Your name" autocomplete="off" style="text-align:right"></label></div>
 
+    </div><div class="c2">
     <div class="group-title">Play</div>
     <div class="tiles">
       <button class="glass tile t0" id="tileFriends">
@@ -215,26 +259,30 @@
       <div class="seg" id="seg"><i></i><button data-bots="1">1</button><button data-bots="2">2</button><button data-bots="3">3</button></div>
       <button class="btn block" id="playCpu">Play</button>
     </div>
+    </div>
   </section>
 
   <section id="lobby" class="view" hidden>
+    <div class="c1">
     <h1>Lobby</h1>
     <p class="lead" id="lobbySub">Share the code with your friends.</p>
     <div class="glass">
       <div class="roomcode" id="lobbyCode"></div>
       <div style="padding:0 16px 16px"><button class="btn block" id="copy">Copy Invite Link</button></div>
     </div>
+    </div><div class="c2">
     <div class="group-title">Players</div>
     <div class="glass group" id="lobbyPlayers"></div>
     <div class="row" id="hostControls" style="margin-top:18px"><button id="addBot" class="btn sec">Add Bot</button><button id="start" class="btn">Start Game</button></div>
     <p class="lead" id="waitHost" style="text-align:center;margin-top:20px" hidden>Waiting for the host to start…</p>
     <button id="leaveLobby" class="btn plain danger block" style="margin-top:10px">Leave</button>
+    </div>
   </section>
 
   <section id="game" class="view" hidden>
     <div id="boardWrap">
       <div class="corners"><div class="badge c0" data-c="0"></div><div class="badge right c1" data-c="1"></div></div>
-      <svg id="board" viewBox="0 0 15 15" role="img" aria-label="Ludo board"></svg>
+      <div id="boardBox"><svg id="board" viewBox="0 0 15 15" role="img" aria-label="Ludo board"></svg></div>
       <div class="corners"><div class="badge c3" data-c="3"></div><div class="badge right c2" data-c="2"></div></div>
       <div id="msg"></div>
       <div id="hint"></div>
@@ -364,7 +412,7 @@ const noNetLib = () => typeof mqtt === 'undefined' && (setStatus('Networking fai
 let wl = null;
 async function wake() { try { if (!wl && navigator.wakeLock && S) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => (wl = null)); } } catch {} }
 function unwake() { try { wl && wl.release(); } catch {} wl = null; }
-function show(id) { ['home', 'lobby', 'game'].forEach(s => ($('#' + s).hidden = s !== id)); if (id !== 'home') wake(); }
+function show(id) { ['home', 'lobby', 'game'].forEach(s => ($('#' + s).hidden = s !== id)); document.body.classList.toggle('ingame', id === 'game'); if (id !== 'home') wake(); }
 function myName() { const n = $('#name').value.trim() || 'Player'; store.set('ludo.name', n); return n; }
 
 /* ---------------- networking ---------------- */

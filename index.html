@@ -303,6 +303,18 @@ function tone(f, d = .09, type = 'sine', v = .06, at = 0) {
     o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d);
   } catch {}
 }
+function thump(f0, f1, d, v) {
+  if (muted) return;
+  try {
+    actx ||= new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + d + .03);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + .05);
+  } catch {}
+}
 const sfx = {
   roll() {
     if (muted) return;
@@ -323,7 +335,8 @@ const sfx = {
       tone(150, .1, 'sine', .09, n * .028 + n * n * .0032);  // final settle
     } catch {}
   },
-  step(i = 0) { tone(520 + i * 38, .07, 'sine', .05); },
+  step(i = 0) { thump(360 + i * 16, 130, .075, .22); },        // each square a piece hops over
+  land() { thump(260, 80, .14, .32); },                         // piece settles on its final square
   out() { tone(660, .1); tone(880, .14, 'sine', .05, .08); },
   home() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .16, 'sine', .06, i * .08)); },
   capture() { tone(220, .2, 'sawtooth', .04); tone(150, .28, 'sawtooth', .04, .08); },
@@ -659,7 +672,7 @@ async function drive(node) {
     place(node, next, ms);
     if (ms === 95) {
       node._ball.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-.3px) scale(1.1)' }, { transform: 'translateY(0)' }], { duration: 95, easing: 'ease-out' });
-      sfx.step(next % 10);
+      next === to ? sfx.land() : sfx.step(next % 10);
     } else if (from === -1) sfx.out();
     else sfx.capture();
     await sleep(ms + 8);
